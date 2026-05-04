@@ -3,26 +3,23 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Cobra Ondulante | Obra Interativa</title>
+    <title>Cobra Makuxi | Realidade Aumentada</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
     <div class="container">
-        <!-- Vídeo de fundo (você pode trocar depois) -->
-        <video id="bgVideo" autoplay loop muted playsinline>
-            <source src="https://assets.mixkit.co/videos/preview/mixkit-jungle-with-flowing-water-1263-large.mp4" type="video/mp4">
-            Seu navegador não suporta vídeo.
-        </video>
+        <!-- Câmera ao vivo como fundo -->
+        <video id="cameraFeed" autoplay playsinline muted></video>
         
-        <!-- Canvas onde a cobra ondula -->
+        <!-- Canvas da cobra sobreposta -->
         <canvas id="snakeCanvas"></canvas>
         
         <div class="info">
-            <p>🐍 INCLINE O CELULAR → A COBRA SE MOVE</p>
-            <p class="small">O corpo da cobra ondula naturalmente</p>
+            <p>🐍 COBRA GRANDE | Realidade Aumentada</p>
+            <p class="small">Aponte a câmera para qualquer superfície | Incline o celular</p>
         </div>
         
-        <button id="startBtn" class="start-btn">🎮 TOCAR PARA ATIVAR MOVIMENTO</button>
+        <button id="startBtn" class="start-btn">🎥 ATIVAR CÂMERA E MOVIMENTO</button>
     </div>
     
     <script src="script.js"></script>

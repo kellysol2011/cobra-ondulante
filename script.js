@@ -1,23 +1,22 @@
-class CobraOndulante {
+class CobraMakuxi {
     constructor(canvas) {
         this.canvas = canvas;
         this.ctx = canvas.getContext('2d');
         
-        // Posição da cabeça (normalizada 0-1)
+        // Posição da cabeça
         this.posX = 0.5;
         this.posY = 0.5;
         
         // Parâmetros da ondulação
-        this.waveAmplitude = 25;  // Amplitude da onda
-        this.waveFrequency = 0.02;
+        this.waveAmplitude = 35;
+        this.waveFrequency = 0.025;
         this.time = 0;
         
         // Segmentos da cobra
         this.segments = [];
-        this.numSegments = 25;
+        this.numSegments = 30;
         this.segmentLength = 18;
         
-        // Inicializa segmentos
         for (let i = 0; i < this.numSegments; i++) {
             this.segments.push({ x: 0, y: 0 });
         }
@@ -31,54 +30,40 @@ class CobraOndulante {
     }
     
     updatePosition(targetX, targetY) {
-        // Suaviza o movimento
         this.posX = this.posX * 0.85 + targetX * 0.15;
         this.posY = this.posY * 0.85 + targetY * 0.15;
     }
     
     updateWave() {
-        this.time += 0.05;
+        this.time += 0.04;
     }
     
     calculateSegmentPositions() {
-        // Cabeça em pixels
         const headX = this.posX * this.canvas.width;
         const headY = this.posY * this.canvas.height;
         
-        // Direção base (para onde a cobra "olha")
-        // A cabeça vai ligeiramente na direção do movimento
-        let angle = Math.atan2(
-            this.segments[0]?.y - headY || 0,
-            this.segments[0]?.x - headX || 0
-        );
+        let angle = 0;
         
-        // Adiciona ondulação sinusoidal ao longo do corpo
         this.segments[0] = { x: headX, y: headY };
         
         for (let i = 1; i < this.numSegments; i++) {
             const prev = this.segments[i - 1];
             
-            // Ângulo base (seguindo o segmento anterior)
             let segmentAngle = angle;
             
-            // Ondulação: cada segmento oscila lateralmente
-            const waveOffset = Math.sin(this.time * 3 + i * this.waveFrequency * 100) * this.waveAmplitude;
+            const waveOffset = Math.sin(this.time * 2.5 + i * this.waveFrequency * 120) * this.waveAmplitude * (1 - i / this.numSegments);
             
-            // Direção perpendicular para ondular
             const perpX = -Math.sin(segmentAngle);
             const perpY = Math.cos(segmentAngle);
             
-            // Posição com ondulação
             let newX = prev.x - Math.cos(segmentAngle) * this.segmentLength;
             let newY = prev.y - Math.sin(segmentAngle) * this.segmentLength;
             
-            // Aplica ondulação perpendicular
-            newX += perpX * waveOffset * (i / this.numSegments);
-            newY += perpY * waveOffset * (i / this.numSegments);
+            newX += perpX * waveOffset;
+            newY += perpY * waveOffset;
             
             this.segments[i] = { x: newX, y: newY };
             
-            // Atualiza ângulo para o próximo segmento
             if (i < this.numSegments - 1) {
                 angle = Math.atan2(
                     this.segments[i].y - this.segments[i - 1].y,
@@ -88,56 +73,96 @@ class CobraOndulante {
         }
     }
     
+    drawMakuxiPattern(x, y, size, isHead = false, index = 0) {
+        if (isHead) {
+            // CABEÇA
+            this.ctx.beginPath();
+            this.ctx.ellipse(x, y, size * 0.9, size * 0.7, 0, 0, Math.PI * 2);
+            this.ctx.fillStyle = '#8B0000';
+            this.ctx.fill();
+            this.ctx.strokeStyle = '#FFD700';
+            this.ctx.lineWidth = 2;
+            this.ctx.stroke();
+            
+            // Olhos
+            this.ctx.fillStyle = '#FFFFFF';
+            this.ctx.beginPath();
+            this.ctx.arc(x - size * 0.3, y - size * 0.15, size * 0.2, 0, Math.PI * 2);
+            this.ctx.arc(x + size * 0.3, y - size * 0.15, size * 0.2, 0, Math.PI * 2);
+            this.ctx.fill();
+            
+            // Pupilas
+            this.ctx.fillStyle = '#000000';
+            this.ctx.beginPath();
+            this.ctx.ellipse(x - size * 0.3, y - size * 0.15, size * 0.08, size * 0.15, 0, 0, Math.PI * 2);
+            this.ctx.ellipse(x + size * 0.3, y - size * 0.15, size * 0.08, size * 0.15, 0, 0, Math.PI * 2);
+            this.ctx.fill();
+            
+            // Língua
+            this.ctx.beginPath();
+            this.ctx.moveTo(x + size * 0.5, y);
+            this.ctx.lineTo(x + size * 0.8, y - 4);
+            this.ctx.lineTo(x + size * 0.8, y + 4);
+            this.ctx.fillStyle = '#FF4444';
+            this.ctx.fill();
+            
+            return;
+        }
+        
+        // CORPO com padrão Makuxi
+        const gradient = this.ctx.createLinearGradient(x - size, y - size, x + size, y + size);
+        gradient.addColorStop(0, '#2F4F2F');
+        gradient.addColorStop(0.5, '#8B0000');
+        gradient.addColorStop(1, '#DAA520');
+        
+        this.ctx.beginPath();
+        this.ctx.arc(x, y, size, 0, Math.PI * 2);
+        this.ctx.fillStyle = gradient;
+        this.ctx.fill();
+        this.ctx.strokeStyle = '#000000';
+        this.ctx.lineWidth = 1.5;
+        this.ctx.stroke();
+        
+        // Padrão de losango
+        const patternSize = size * 0.6;
+        this.ctx.beginPath();
+        this.ctx.moveTo(x, y - patternSize * 0.5);
+        this.ctx.lineTo(x + patternSize * 0.4, y);
+        this.ctx.lineTo(x, y + patternSize * 0.5);
+        this.ctx.lineTo(x - patternSize * 0.4, y);
+        this.ctx.closePath();
+        this.ctx.fillStyle = '#FFD700';
+        this.ctx.fill();
+        this.ctx.stroke();
+        
+        // Pontos brancos
+        this.ctx.fillStyle = '#FFFFFF';
+        this.ctx.beginPath();
+        this.ctx.arc(x - size * 0.2, y - size * 0.2, size * 0.07, 0, Math.PI * 2);
+        this.ctx.arc(x + size * 0.2, y + size * 0.2, size * 0.07, 0, Math.PI * 2);
+        this.ctx.fill();
+    }
+    
     draw() {
         if (!this.ctx) return;
         this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
         
-        // Desenha cada segmento como um círculo conectado
-        for (let i = 0; i < this.segments.length; i++) {
+        for (let i = this.segments.length - 1; i >= 0; i--) {
             const seg = this.segments[i];
-            const size = 18 - (i / this.numSegments) * 6; // Diminui pro rabo
-            const gradient = this.ctx.createRadialGradient(seg.x, seg.y, 2, seg.x, seg.y, size);
+            if (!seg) continue;
             
-            // Cores: verde escuro na cabeça, mais claro no corpo
+            let size;
+            let isHead = false;
+            
             if (i === 0) {
-                gradient.addColorStop(0, '#2ecc71');
-                gradient.addColorStop(1, '#27ae60');
+                size = Math.min(this.canvas.width, this.canvas.height) * 0.045;
+                isHead = true;
             } else {
-                gradient.addColorStop(0, '#58d68d');
-                gradient.addColorStop(1, '#1e8449');
+                const proportion = 1 - (i / this.numSegments) * 0.4;
+                size = Math.min(this.canvas.width, this.canvas.height) * 0.028 * proportion;
             }
             
-            this.ctx.beginPath();
-            this.ctx.arc(seg.x, seg.y, size, 0, Math.PI * 2);
-            this.ctx.fillStyle = gradient;
-            this.ctx.fill();
-            this.ctx.strokeStyle = '#145a32';
-            this.ctx.lineWidth = 1.5;
-            this.ctx.stroke();
-        }
-        
-        // Desenha olhos na cabeça
-        const head = this.segments[0];
-        if (head) {
-            this.ctx.fillStyle = 'white';
-            this.ctx.beginPath();
-            this.ctx.arc(head.x - 6, head.y - 4, 3, 0, Math.PI * 2);
-            this.ctx.arc(head.x + 6, head.y - 4, 3, 0, Math.PI * 2);
-            this.ctx.fill();
-            
-            this.ctx.fillStyle = 'black';
-            this.ctx.beginPath();
-            this.ctx.arc(head.x - 6.5, head.y - 5, 1.5, 0, Math.PI * 2);
-            this.ctx.arc(head.x + 5.5, head.y - 5, 1.5, 0, Math.PI * 2);
-            this.ctx.fill();
-            
-            // Língua (opcional)
-            this.ctx.beginPath();
-            this.ctx.moveTo(head.x + 12, head.y);
-            this.ctx.lineTo(head.x + 20, head.y - 3);
-            this.ctx.lineTo(head.x + 20, head.y + 3);
-            this.ctx.fillStyle = '#e74c3c';
-            this.ctx.fill();
+            this.drawMakuxiPattern(seg.x, seg.y, size, isHead, i);
         }
     }
     
@@ -148,19 +173,38 @@ class CobraOndulante {
     }
 }
 
-// --- Gerencia movimento do celular e inicialização ---
+// --- Inicialização da câmera e movimento ---
 let cobra;
 let canvas;
 
+async function iniciarCamera() {
+    try {
+        const stream = await navigator.mediaDevices.getUserMedia({ 
+            video: { 
+                facingMode: 'environment'  // Câmera traseira
+            } 
+        });
+        
+        const videoFeed = document.getElementById('cameraFeed');
+        videoFeed.srcObject = stream;
+        await videoFeed.play();
+        
+        return true;
+    } catch (err) {
+        console.error('Erro ao acessar câmera:', err);
+        alert('Não foi possível acessar a câmera. Verifique as permissões.');
+        return false;
+    }
+}
+
 function init() {
     canvas = document.getElementById('snakeCanvas');
-    cobra = new CobraOndulante(canvas);
+    cobra = new CobraMakuxi(canvas);
     
     window.addEventListener('resize', () => {
         cobra.resize();
     });
     
-    // Animação contínua
     function animateLoop() {
         cobra.animate();
         requestAnimationFrame(animateLoop);
@@ -171,18 +215,16 @@ function init() {
 function handleOrientation(event) {
     if (!cobra) return;
     
-    let gamma = event.gamma;  // -90 a 90 (esquerda/direita)
-    let beta = event.beta;    // -180 a 180 (frente/trás)
+    let gamma = event.gamma;
+    let beta = event.beta;
     
     if (gamma === null || beta === null) return;
     
-    // Mapeia inclinação para posição na tela (0 a 1)
     let targetX = (gamma + 90) / 180;
     let targetY = (beta + 90) / 180;
     
-    // Ajusta limites para não sair completamente da tela
-    targetX = Math.min(Math.max(targetX, 0.1), 0.9);
-    targetY = Math.min(Math.max(targetY, 0.1), 0.9);
+    targetX = Math.min(Math.max(targetX, 0.08), 0.92);
+    targetY = Math.min(Math.max(targetY, 0.08), 0.92);
     
     cobra.updatePosition(targetX, targetY);
 }
@@ -190,32 +232,40 @@ function handleOrientation(event) {
 function requestOrientationPermission() {
     if (typeof DeviceOrientationEvent !== 'undefined' && 
         typeof DeviceOrientationEvent.requestPermission === 'function') {
-        // iOS precisa de permissão explícita
         DeviceOrientationEvent.requestPermission()
             .then(permissionState => {
                 if (permissionState === 'granted') {
                     window.addEventListener('deviceorientation', handleOrientation);
-                    document.getElementById('startBtn').style.display = 'none';
                 }
             })
             .catch(err => console.log(err));
     } else {
-        // Android e outros
         window.addEventListener('deviceorientation', handleOrientation);
-        document.getElementById('startBtn').style.display = 'none';
     }
 }
 
-// Inicialização
+// Botão principal: ativa câmera E movimento
 window.addEventListener('load', () => {
     init();
     
     const startBtn = document.getElementById('startBtn');
-    startBtn.addEventListener('click', () => {
-        requestOrientationPermission();
+    startBtn.addEventListener('click', async () => {
+        startBtn.textContent = '📷 INICIANDO...';
+        startBtn.disabled = true;
+        
+        // Ativa câmera
+        const cameraOk = await iniciarCamera();
+        
+        if (cameraOk) {
+            // Ativa movimento do celular
+            requestOrientationPermission();
+            startBtn.style.display = 'none';
+        } else {
+            startBtn.textContent = '❌ ERRO NA CÂMERA - TENTE NOVAMENTE';
+            startBtn.disabled = false;
+            setTimeout(() => {
+                startBtn.textContent = '🎥 ATIVAR CÂMERA E MOVIMENTO';
+            }, 3000);
+        }
     });
-    
-    // Vídeo autoplay (alguns navegadores precisam de interação)
-    const video = document.getElementById('bgVideo');
-    video.play().catch(e => console.log('Toque na tela para iniciar vídeo'));
 });
