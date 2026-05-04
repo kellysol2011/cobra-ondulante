@@ -1,27 +1,520 @@
 <!DOCTYPE html>
-<html lang="pt-br">
+<html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Cobra Makuxi | Realidade Aumentada</title>
-    <link rel="stylesheet" href="style.css">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Cobra Ondulante | Movimento com o Celular</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            user-select: none;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        body {
+            background: linear-gradient(145deg, #1a472a 0%, #0e2a1a 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-family: 'Segoe UI', system-ui, -apple-system, 'Roboto', sans-serif;
+            padding: 20px;
+        }
+
+        .container {
+            background: rgba(0,0,0,0.4);
+            border-radius: 56px;
+            padding: 20px;
+            backdrop-filter: blur(6px);
+            box-shadow: 0 25px 40px rgba(0,0,0,0.5);
+        }
+
+        .canvas-wrapper {
+            background: #2b5e2b;
+            border-radius: 48px;
+            box-shadow: inset 0 0 0 3px rgba(255,240,170,0.6), 0 20px 30px -8px black;
+            overflow: hidden;
+        }
+
+        canvas {
+            display: block;
+            width: 100%;
+            height: auto;
+            background: #b7d968;
+            cursor: pointer;
+            touch-action: none;
+            border-radius: 44px;
+        }
+
+        .info-panel {
+            margin-top: 24px;
+            background: rgba(20,35,20,0.85);
+            backdrop-filter: blur(12px);
+            border-radius: 48px;
+            padding: 18px 20px;
+            color: white;
+            text-align: center;
+            border: 1px solid rgba(255,215,100,0.5);
+        }
+
+        .title {
+            font-weight: 800;
+            font-size: 1.6rem;
+            letter-spacing: -0.5px;
+            background: linear-gradient(135deg, #F9E0A0, #D4A537);
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+            margin-bottom: 6px;
+        }
+
+        .status {
+            font-size: 0.9rem;
+            background: #1e3a2a;
+            display: inline-block;
+            padding: 5px 16px;
+            border-radius: 60px;
+            margin: 8px 0;
+            font-weight: 500;
+        }
+
+        .gyro-data {
+            font-family: monospace;
+            font-size: 0.8rem;
+            background: #00000066;
+            padding: 8px 12px;
+            border-radius: 36px;
+            display: inline-flex;
+            gap: 18px;
+            justify-content: center;
+            flex-wrap: wrap;
+            margin: 6px 0;
+        }
+
+        button {
+            background: #d4a537;
+            border: none;
+            color: #1f2a0a;
+            font-weight: bold;
+            padding: 12px 26px;
+            border-radius: 60px;
+            font-size: 1rem;
+            margin-top: 12px;
+            box-shadow: 0 5px 0 #7a5a1a;
+            transition: 0.07s linear;
+            cursor: pointer;
+            font-weight: 600;
+        }
+
+        button:active {
+            transform: translateY(2px);
+            box-shadow: 0 2px 0 #7a5a1a;
+        }
+
+        .hint {
+            font-size: 0.75rem;
+            opacity: 0.85;
+            margin-top: 12px;
+            border-top: 1px solid rgba(255,230,150,0.3);
+            padding-top: 12px;
+        }
+
+        @media (max-width: 600px) {
+            .container { padding: 12px; }
+            .title { font-size: 1.3rem; }
+        }
+    </style>
 </head>
 <body>
+<div>
     <div class="container">
-        <!-- Câmera ao vivo como fundo -->
-        <video id="cameraFeed" autoplay playsinline muted></video>
-        
-        <!-- Canvas da cobra sobreposta -->
-        <canvas id="snakeCanvas"></canvas>
-        
-        <div class="info">
-            <p>🐍 COBRA GRANDE | Realidade Aumentada</p>
-            <p class="small">Aponte a câmera para qualquer superfície | Incline o celular</p>
+        <div class="canvas-wrapper">
+            <canvas id="snakeCanvas" width="700" height="500" style="width:100%; height:auto; max-width:700px; aspect-ratio:700/500"></canvas>
         </div>
-        
-        <button id="startBtn" class="start-btn">🎥 ATIVAR CÂMERA E MOVIMENTO</button>
+        <div class="info-panel">
+            <div class="title">🐍 COBRA ONDULANTE</div>
+            <div class="status" id="sensorStatus">🌀 AGUARDANDO PERMISSÃO</div>
+            <div class="gyro-data" id="gyroValues">
+                <span>📳 Inclinação X: --</span>
+                <span>📳 Inclinação Y: --</span>
+            </div>
+            <button id="requestBtn">📱 ATIVAR MOVIMENTO DO CELULAR</button>
+            <div class="hint">
+                ✨ Incline o celular → a cobra desliza pela tela.<br>
+                🐍 Ela já se move como uma serpente (ondulação contínua) + giroscópio!
+            </div>
+        </div>
     </div>
-    
-    <script src="script.js"></script>
+</div>
+
+<script>
+    (function(){
+        // ----- CONFIGURAÇÕES DA COBRA E ANIMAÇÃO -----
+        const canvas = document.getElementById('snakeCanvas');
+        const ctx = canvas.getContext('2d');
+        canvas.width = 700;
+        canvas.height = 500;
+        
+        // Posição base da cobra (centro do canvas + offset do giroscópio)
+        let globalOffsetX = 0;
+        let globalOffsetY = 0;
+        const MAX_MOVE_X = 110;   // deslocamento máximo horizontal (+-110px)
+        const MAX_MOVE_Y = 80;    // deslocamento vertical (+-80px)
+        
+        // Valores do giroscópio
+        let gamma = 0;   // esquerda/direita
+        let beta = 0;    // frente/trás
+        let smoothGamma = 0, smoothBeta = 0;
+        const SMOOTHING = 0.2;
+        let orientationEnabled = false;
+        
+        // ----- ANIMAÇÃO DA ONDULAÇÃO (movimento de cobra rastejante) -----
+        let time = 0;
+        const SPEED_WAVE = 4.5;    // velocidade da ondulação (radianos por segundo)
+        const AMPLITUDE_WAVE = 28;  // amplitude da curvatura lateral (px)
+        const BODY_SEGMENTS = 28;   // número de segmentos do corpo
+        
+        // Estrutura para armazenar as posições globais de cada segmento (para desenho)
+        let segmentPoints = [];
+        
+        // Parâmetros da cabeça e cauda
+        const HEAD_SIZE = 18;
+        const BODY_WIDTH = 16;
+        
+        // Função que calcula a curva da cobra baseada no tempo (onda serpentina)
+        // Retorna um array de pontos (x, y) relativos à posição central da cobra.
+        function calcularOndulacao(centerX, centerY, tempo) {
+            const points = [];
+            // comprimento total da cobra (espaço entre segmentos)
+            const step = 13.5;
+            const totalLength = step * (BODY_SEGMENTS - 1);
+            // ângulo base da onda: varia com o tempo, dando sensação de rastejo
+            const phaseOffset = tempo * SPEED_WAVE;
+            
+            for (let i = 0; i < BODY_SEGMENTS; i++) {
+                // t de 0 a 1 (0 = cabeça, 1 = cauda)
+                let t = i / (BODY_SEGMENTS - 1);
+                // posição ao longo do eixo X (direção geral da cobra: horizontal, mas com ondulação vertical? 
+                // Cobra rasteja para a direita, mas a onda é lateral (seno). Vamos fazer um movimento tipo "S" horizontal.
+                // A cobra se estende da esquerda para a direita (mas pode inverter se quiser).
+                // Para parecer que está rastejando, o corpo ondula no eixo Y.
+                let x = centerX - totalLength/2 + i * step;
+                // Onda no eixo Y (movimento lateral da serpente)
+                let yOffset = Math.sin(t * Math.PI * 2.8 + phaseOffset) * AMPLITUDE_WAVE * (1 - t * 0.3);
+                // também uma pequena modulação na altura para dar profundidade
+                let y = centerY + yOffset;
+                
+                // Pequena inclinação da cabeça e cauda
+                points.push({ x, y });
+            }
+            return points;
+        }
+        
+        // Função que desenha a cobra com base nos pontos calculados (corpo segmentado, cabeça, olhos, língua)
+        function desenharCobra(points, tempo) {
+            if (points.length < 2) return;
+            
+            // Desenhar corpo (segmentos arredondados conectados)
+            for (let i = 0; i < points.length - 1; i++) {
+                const p1 = points[i];
+                const p2 = points[i+1];
+                const angle = Math.atan2(p2.y - p1.y, p2.x - p1.x);
+                const dist = Math.hypot(p2.x - p1.x, p2.y - p1.y);
+                // espessura diminui da cabeça para a cauda
+                const thickness = BODY_WIDTH * (1 - (i / points.length) * 0.4);
+                
+                ctx.save();
+                ctx.translate(p1.x, p1.y);
+                ctx.rotate(angle);
+                ctx.beginPath();
+                ctx.ellipse(0, 0, thickness/2, dist/2, 0, 0, Math.PI*2);
+                // Gradiente no corpo
+                const grad = ctx.createLinearGradient(-thickness/2, -dist/2, thickness/2, dist/2);
+                grad.addColorStop(0, '#3f8141');
+                grad.addColorStop(1, '#255c27');
+                ctx.fillStyle = grad;
+                ctx.fill();
+                ctx.strokeStyle = '#1c4518';
+                ctx.lineWidth = 1.2;
+                ctx.stroke();
+                ctx.restore();
+            }
+            
+            // Escamas decorativas (pequenos pontos)
+            for (let i = 2; i < points.length - 2; i+=2) {
+                ctx.beginPath();
+                ctx.arc(points[i].x, points[i].y, 2.5, 0, Math.PI*2);
+                ctx.fillStyle = '#d9c53c';
+                ctx.fill();
+                ctx.beginPath();
+                ctx.arc(points[i].x-2, points[i].y-1, 1.2, 0, Math.PI*2);
+                ctx.fillStyle = '#f7e05e';
+                ctx.fill();
+            }
+            
+            // CABEÇA (no primeiro ponto)
+            const head = points[0];
+            const nextPoint = points[1];
+            const headAngle = Math.atan2(nextPoint.y - head.y, nextPoint.x - head.x);
+            
+            ctx.save();
+            ctx.translate(head.x, head.y);
+            ctx.rotate(headAngle);
+            // Formato da cabeça (elipse mais larga)
+            ctx.beginPath();
+            ctx.ellipse(0, 0, HEAD_SIZE, HEAD_SIZE*0.85, 0, 0, Math.PI*2);
+            ctx.fillStyle = '#4c9e2e';
+            ctx.fill();
+            ctx.strokeStyle = '#1b4f1a';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+            
+            // Olhos (branco + pupila)
+            ctx.fillStyle = '#f5f9f0';
+            ctx.beginPath();
+            ctx.ellipse(HEAD_SIZE*0.55, -HEAD_SIZE*0.4, 4.5, 5.5, 0, 0, Math.PI*2);
+            ctx.fill();
+            ctx.beginPath();
+            ctx.ellipse(HEAD_SIZE*0.55, HEAD_SIZE*0.4, 4.5, 5.5, 0, 0, Math.PI*2);
+            ctx.fill();
+            
+            ctx.fillStyle = '#030303';
+            ctx.beginPath();
+            ctx.arc(HEAD_SIZE*0.7, -HEAD_SIZE*0.45, 2.2, 0, Math.PI*2);
+            ctx.fill();
+            ctx.beginPath();
+            ctx.arc(HEAD_SIZE*0.7, HEAD_SIZE*0.45, 2.2, 0, Math.PI*2);
+            ctx.fill();
+            ctx.fillStyle = 'white';
+            ctx.beginPath();
+            ctx.arc(HEAD_SIZE*0.82, -HEAD_SIZE*0.55, 1, 0, Math.PI*2);
+            ctx.fill();
+            ctx.beginPath();
+            ctx.arc(HEAD_SIZE*0.82, HEAD_SIZE*0.35, 1, 0, Math.PI*2);
+            ctx.fill();
+            
+            // Língua bifurcada (animada com o tempo)
+            const tonguePhase = Math.sin(tempo * 18) * 0.5 + 0.5;
+            ctx.beginPath();
+            ctx.moveTo(HEAD_SIZE + 3, -3);
+            ctx.lineTo(HEAD_SIZE + 9 + tonguePhase*2, -6);
+            ctx.lineTo(HEAD_SIZE + 9, -2);
+            ctx.fillStyle = '#e34234';
+            ctx.fill();
+            ctx.beginPath();
+            ctx.moveTo(HEAD_SIZE + 3, 3);
+            ctx.lineTo(HEAD_SIZE + 9 + tonguePhase*2, 6);
+            ctx.lineTo(HEAD_SIZE + 9, 2);
+            ctx.fill();
+            
+            ctx.restore();
+            
+            // CAUDA (ponta afilada)
+            const tail = points[points.length-1];
+            const prevTail = points[points.length-2];
+            const tailAngle = Math.atan2(tail.y - prevTail.y, tail.x - prevTail.x);
+            ctx.save();
+            ctx.translate(tail.x, tail.y);
+            ctx.rotate(tailAngle);
+            ctx.beginPath();
+            ctx.moveTo(0, 0);
+            ctx.lineTo(-12, -6);
+            ctx.lineTo(-12, 6);
+            ctx.fillStyle = '#2c6e1f';
+            ctx.fill();
+            ctx.restore();
+        }
+        
+        // Fundo decorativo com textura de folhagem/grama
+        function desenharFundo() {
+            ctx.fillStyle = '#b7d968';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            // Manchas vegetais
+            for(let i=0;i<80;i++) {
+                ctx.fillStyle = `rgba(80,120,40,${Math.random() * 0.3})`;
+                ctx.beginPath();
+                ctx.ellipse(Math.random()*canvas.width, Math.random()*canvas.height, 8, 4, Math.random()*Math.PI, 0, 2*Math.PI);
+                ctx.fill();
+            }
+            // pequenos pontos de luz
+            ctx.fillStyle = '#d9f0a3';
+            for(let i=0;i<150;i++) {
+                ctx.beginPath();
+                ctx.arc(Math.random()*canvas.width, Math.random()*canvas.height, 1.2, 0, Math.PI*2);
+                ctx.fill();
+            }
+        }
+        
+        // Função principal de animação: atualiza tempo, recalcula pontos de corpo considerando offset do giroscópio e desenha
+        let animationId = null;
+        let lastTimestamp = 0;
+        
+        function animarCobra(now) {
+            if (!ctx) return;
+            // Atualiza tempo para onda contínua (independente de FPS)
+            if (!lastTimestamp) lastTimestamp = now;
+            let delta = Math.min(0.033, (now - lastTimestamp) / 1000);
+            if (delta > 0) {
+                time += delta;
+            }
+            lastTimestamp = now;
+            
+            // Calcula centro base da cobra = (centro do canvas + deslocamento do giroscópio)
+            const centerBaseX = canvas.width/2 + globalOffsetX;
+            const centerBaseY = canvas.height/2 + globalOffsetY;
+            
+            // Gera pontos ondulados relativos ao centro atual (efeito de rastejo S)
+            const rawPoints = calcularOndulacao(centerBaseX, centerBaseY, time);
+            
+            // Limita pontos para dentro do canvas (evitar que suma totalmente)
+            for(let p of rawPoints) {
+                p.x = Math.min(canvas.width - 15, Math.max(15, p.x));
+                p.y = Math.min(canvas.height - 20, Math.max(20, p.y));
+            }
+            segmentPoints = rawPoints;
+            
+            // Desenhar tudo
+            desenharFundo();
+            desenharCobra(segmentPoints, time);
+            
+            // Pequenas partículas ao redor (estilo rastro)
+            ctx.fillStyle = '#ffe6a3';
+            for(let i=0;i<6;i++) {
+                let tailIdx = segmentPoints.length-1 - i%3;
+                if(segmentPoints[tailIdx]) {
+                    ctx.beginPath();
+                    ctx.arc(segmentPoints[tailIdx].x + (Math.sin(time*12+i)*3), segmentPoints[tailIdx].y + (Math.cos(time*9+i)*2), 2, 0, Math.PI*2);
+                    ctx.fill();
+                }
+            }
+            
+            animationId = requestAnimationFrame(animarCobra);
+        }
+        
+        // ----- LÓGICA DO GIROSCÓPIO (MOVIMENTO DO CELULAR) -----
+        function atualizarOffsetPorOrientacao() {
+            if (!orientationEnabled) {
+                globalOffsetX = 0;
+                globalOffsetY = 0;
+                return;
+            }
+            // Mapeamento suave
+            let rawGamma = gamma;
+            let rawBeta = beta;
+            // Limitar faixa utilizável
+            let clampedGamma = Math.min(55, Math.max(-55, rawGamma));
+            let clampedBeta = Math.min(50, Math.max(-50, rawBeta));
+            
+            smoothGamma = smoothGamma * (1 - SMOOTHING) + clampedGamma * SMOOTHING;
+            smoothBeta = smoothBeta * (1 - SMOOTHING) + clampedBeta * SMOOTHING;
+            
+            // gamma: inclinação esquerda/direita → move cobra horizontalmente
+            let targetX = (smoothGamma / 55) * MAX_MOVE_X;
+            // beta: inclinação frente/trás → move verticalmente (invertido para sensação natural)
+            let targetY = (smoothBeta / 45) * MAX_MOVE_Y;
+            
+            globalOffsetX = targetX;
+            globalOffsetY = targetY;
+            
+            // Atualizar interface
+            document.getElementById('gyroValues').innerHTML = 
+                `<span>📐 Inclinação X: ${Math.round(gamma)}°</span>
+                 <span>📐 Inclinação Y: ${Math.round(beta)}°</span>
+                 <span>🐍 Offset (${Math.round(globalOffsetX)}px, ${Math.round(globalOffsetY)}px)</span>`;
+        }
+        
+        function handleOrientation(event) {
+            if (!orientationEnabled) return;
+            if (event.gamma !== null) gamma = event.gamma;
+            if (event.beta !== null) beta = event.beta;
+            atualizarOffsetPorOrientacao();
+        }
+        
+        // Ativação do sensor (iOS requer permissão por toque)
+        function ativarSensorMovimento() {
+            if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
+                DeviceOrientationEvent.requestPermission()
+                    .then(permissionState => {
+                        if (permissionState === 'granted') {
+                            window.addEventListener('deviceorientation', handleOrientation);
+                            orientationEnabled = true;
+                            document.getElementById('sensorStatus').innerHTML = '✅ SENSOR ATIVO | INCLINE O CELULAR';
+                            document.getElementById('sensorStatus').style.background = '#2a7a4a';
+                        } else {
+                            document.getElementById('sensorStatus').innerHTML = '❌ Permissão negada. Recarregue e tente.';
+                        }
+                    })
+                    .catch(err => {
+                        console.error(err);
+                        document.getElementById('sensorStatus').innerHTML = '⚠️ Erro na permissão do giroscópio';
+                    });
+            } else {
+                // Android e desktop (se disponível)
+                window.addEventListener('deviceorientation', handleOrientation);
+                orientationEnabled = true;
+                document.getElementById('sensorStatus').innerHTML = '📳 MOVIMENTO ATIVO | INCLINE O CELULAR';
+                document.getElementById('sensorStatus').style.background = '#2a7a4a';
+            }
+        }
+        
+        // Botão de requisição manual
+        const requestBtn = document.getElementById('requestBtn');
+        requestBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            if (orientationEnabled) {
+                document.getElementById('sensorStatus').innerHTML = '⚡ JÁ ATIVO | INCLINE O CELULAR';
+                return;
+            }
+            ativarSensorMovimento();
+        });
+        
+        // Suporte a giroscópio
+        if (!window.DeviceOrientationEvent) {
+            document.getElementById('sensorStatus').innerHTML = '📟 Este navegador não suporta giroscópio.';
+            orientationEnabled = false;
+            requestBtn.disabled = true;
+            requestBtn.style.opacity = 0.5;
+            requestBtn.textContent = '🚫 Sem suporte';
+        } else {
+            // Se não for iOS (ou seja, Android), podemos inicializar sem prompt? Mas alguns Android ainda exigem interação? 
+            // Vamos deixar o botão como padrão para segurança, mas caso já tenha permissão implícita, podemos tentar ativar.
+            if (!(typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function')) {
+                // Android provavelmente: ativar permissão automática?
+                window.addEventListener('deviceorientation', handleOrientation);
+                orientationEnabled = true;
+                document.getElementById('sensorStatus').innerHTML = '📱 SENSOR ATIVO | INCLINE O CELULAR';
+            } else {
+                document.getElementById('sensorStatus').innerHTML = '📱 Toque em "ATIVAR MOVIMENTO" para usar giroscópio';
+            }
+        }
+        
+        // Iniciar animação da cobra (ondulação contínua)
+        function iniciarAnimacao() {
+            time = 0;
+            animationId = requestAnimationFrame(animarCobra);
+        }
+        
+        iniciarAnimacao();
+        
+        // Garantir redesenho ao redimensionar
+        window.addEventListener('resize', () => {
+            // não precisa recriar canvas, só redesenha na próxima frame
+        });
+        
+        // Ajustar se o usuário quiser reiniciar a animação
+        console.log("Cobra ondulante + movimento por celular carregada com sucesso!");
+        
+        // Adicionar dicas extras no hint
+        const hintDiv = document.querySelector('.hint');
+        if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
+            hintDiv.innerHTML += `<br><strong>📱 iOS:</strong> Toque no botão e permita acesso aos movimentos.`;
+        } else {
+            hintDiv.innerHTML += `<br><strong>🤖 Android/PC:</strong> O movimento já está ativo; incline o dispositivo.`;
+        }
+        hintDiv.innerHTML += `<br>🐍 A cobra já ondula sozinha como uma serpente!`;
+    })();
+</script>
 </body>
 </html>
